@@ -93,6 +93,7 @@ func updateMetrics(client *iaas.APIClient, projectID string) error {
 		return err
 	}
 
+	log.Printf("Updating metrics for %d servers", len(*servers.Items))
 	for _, srv := range *servers.Items {
 		if srv.Id == nil || srv.Name == nil || srv.AvailabilityZone == nil || srv.MachineType == nil {
 			continue
