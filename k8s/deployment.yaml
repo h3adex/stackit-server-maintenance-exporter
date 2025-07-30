@@ -22,7 +22,7 @@ spec:
               name: http
           envFrom:
             - secretRef:
-                name: stackit-credentials  # 👉 Replace with your actual Secret name
+                name: stackit-credentials  # Replace with your actual Secret name
           livenessProbe:
             httpGet:
               path: /healthz
