@@ -101,15 +101,30 @@ func updateMetrics(client *iaas.APIClient, projectID string) error {
 		labels := []string{*srv.Id, *srv.Name, *srv.AvailabilityZone, *srv.MachineType}
 
 		if mw := srv.MaintenanceWindow; mw != nil {
+			// Use actual values if available; else use 0
 			if mw.StartsAt != nil {
 				maintenanceStartMetric.WithLabelValues(labels...).Set(float64(mw.StartsAt.UTC().Unix()))
+			} else {
+				maintenanceStartMetric.WithLabelValues(labels...).Set(0)
 			}
+
 			if mw.EndsAt != nil {
 				maintenanceEndMetric.WithLabelValues(labels...).Set(float64(mw.EndsAt.UTC().Unix()))
+			} else {
+				maintenanceEndMetric.WithLabelValues(labels...).Set(0)
 			}
+
 			if mw.Status != nil {
 				updateStatusMetric(*mw.Status, labels)
+			} else {
+				// If no status, set both known statuses to 0
+				clearStatusMetrics(labels)
 			}
+		} else {
+			// No maintenance window — set all metrics to 0
+			maintenanceStartMetric.WithLabelValues(labels...).Set(0)
+			maintenanceEndMetric.WithLabelValues(labels...).Set(0)
+			clearStatusMetrics(labels)
 		}
 	}
 
@@ -126,5 +141,14 @@ func updateStatusMetric(status string, baseLabels []string) {
 			}
 			maintenanceStatusMetric.WithLabelValues(append(baseLabels, s)...).Set(value)
 		}
+	default:
+		// Unknown status — set all known statuses to 0
+		clearStatusMetrics(baseLabels)
+	}
+}
+
+func clearStatusMetrics(baseLabels []string) {
+	for _, s := range []string{statusPlanned, statusOngoing} {
+		maintenanceStatusMetric.WithLabelValues(append(baseLabels, s)...).Set(0)
 	}
 }
