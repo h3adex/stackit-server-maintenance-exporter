@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: stackit-maintenance-exporter
+  labels:
+    release: prometheus  # Replace with your Prometheus Operator release name if different
+spec:
+  selector:
+    matchLabels:
+      app: stackit-maintenance-exporter
+  endpoints:
+    - port: http
+      interval: 60s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - default  # Replace with the namespace where this exporter runs

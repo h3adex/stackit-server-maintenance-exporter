@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stackit-maintenance-exporter
+  labels:
+    app: stackit-maintenance-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stackit-maintenance-exporter
+  template:
+    metadata:
+      labels:
+        app: stackit-maintenance-exporter
+    spec:
+      containers:
+        - name: exporter
+          image: your-docker-repo/stackit-maintenance-exporter:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - secretRef:
+                name: stackit-credentials  # 👉 Replace with your actual Secret name
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
