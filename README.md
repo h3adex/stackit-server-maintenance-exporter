@@ -49,6 +49,6 @@ groups:
         annotations:
           summary: "Maintenance changed for {{ $labels.server_id }}"
           description: >
-            The maintenance start time changed or was added for server:
+            The maintenance start time changed for server:
             {{ $labels.name }} ({{ $labels.server_id }}) in zone {{ $labels.zone }}.
 ```
