@@ -20,13 +20,14 @@ const (
 	statusOngoing  = "ONGOING"
 )
 
+// Metric definitions
 var (
 	maintenanceStartMetric = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "stackit_server_maintenance_start_timestamp",
 			Help: "Scheduled maintenance window start time (Unix timestamp)",
 		},
-		[]string{"server_id", "name", "zone", "machine_type"},
+		[]string{"server_id", "name", "zone", "machine_type", "maintenance_window_readable"},
 	)
 
 	maintenanceEndMetric = prometheus.NewGaugeVec(
@@ -34,7 +35,7 @@ var (
 			Name: "stackit_server_maintenance_end_timestamp",
 			Help: "Scheduled maintenance window end time (Unix timestamp)",
 		},
-		[]string{"server_id", "name", "zone", "machine_type"},
+		[]string{"server_id", "name", "zone", "machine_type", "maintenance_window_readable"},
 	)
 
 	maintenanceStatusMetric = prometheus.NewGaugeVec(
@@ -42,7 +43,7 @@ var (
 			Name: "stackit_server_maintenance_status",
 			Help: "Status of the maintenance window (one-hot encoded: PLANNED or ONGOING = 1, others = 0)",
 		},
-		[]string{"server_id", "name", "zone", "machine_type", "status"},
+		[]string{"server_id", "name", "zone", "machine_type", "maintenance_window_readable", "status"},
 	)
 )
 
@@ -63,6 +64,7 @@ func main() {
 
 	go startScraper(client, projectID)
 
+	// Set up HTTP server
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -75,6 +77,7 @@ func main() {
 	}
 }
 
+// startScraper runs a ticker to periodically update metrics
 func startScraper(client *iaas.APIClient, projectID string) {
 	ticker := time.NewTicker(scrapeInterval)
 	defer ticker.Stop()
@@ -87,6 +90,7 @@ func startScraper(client *iaas.APIClient, projectID string) {
 	}
 }
 
+// updateMetrics fetches server data and sets Prometheus metrics
 func updateMetrics(client *iaas.APIClient, projectID string) error {
 	servers, err := client.ListServers(context.Background(), projectID).Execute()
 	if err != nil {
@@ -99,55 +103,63 @@ func updateMetrics(client *iaas.APIClient, projectID string) error {
 			continue
 		}
 
-		labels := []string{*srv.Id, *srv.Name, *srv.AvailabilityZone, *srv.MachineType}
+		var readableLabel string
+		var unixStart, unixEnd float64
 
-		if mw := srv.MaintenanceWindow; mw != nil {
-			// Use actual values if available; else use 0
-			if mw.StartsAt != nil {
-				maintenanceStartMetric.WithLabelValues(labels...).Set(float64(mw.StartsAt.UTC().Unix()))
-			} else {
-				maintenanceStartMetric.WithLabelValues(labels...).Set(0)
-			}
-
-			if mw.EndsAt != nil {
-				maintenanceEndMetric.WithLabelValues(labels...).Set(float64(mw.EndsAt.UTC().Unix()))
-			} else {
-				maintenanceEndMetric.WithLabelValues(labels...).Set(0)
-			}
-
-			if mw.Status != nil {
-				updateStatusMetric(*mw.Status, labels)
-			} else {
-				// If no status, set both known statuses to 0
-				clearStatusMetrics(labels)
-			}
+		mw := srv.MaintenanceWindow
+		if mw != nil && mw.StartsAt != nil && mw.EndsAt != nil {
+			// Label = full window in RFC3339 (from - to)
+			readableLabel = mw.StartsAt.UTC().Format(time.RFC3339) + "_to_" + mw.EndsAt.UTC().Format(time.RFC3339)
+			unixStart = float64(mw.StartsAt.UTC().Unix())
+			unixEnd = float64(mw.EndsAt.UTC().Unix())
+		} else if mw != nil && mw.StartsAt != nil {
+			readableLabel = mw.StartsAt.UTC().Format(time.RFC3339)
+			unixStart = float64(mw.StartsAt.UTC().Unix())
+			unixEnd = 0
 		} else {
-			// No maintenance window — set all metrics to 0
-			maintenanceStartMetric.WithLabelValues(labels...).Set(0)
-			maintenanceEndMetric.WithLabelValues(labels...).Set(0)
-			clearStatusMetrics(labels)
+			readableLabel = "unknown"
+			unixStart = 0
+			unixEnd = 0
+		}
+
+		baseLabels := []string{
+			*srv.Id,
+			*srv.Name,
+			*srv.AvailabilityZone,
+			*srv.MachineType,
+			readableLabel,
+		}
+
+		// Update metrics
+		maintenanceStartMetric.WithLabelValues(baseLabels...).Set(unixStart)
+		maintenanceEndMetric.WithLabelValues(baseLabels...).Set(unixEnd)
+
+		if mw != nil && mw.Status != nil {
+			updateStatusMetric(*mw.Status, baseLabels)
+		} else {
+			clearStatusMetrics(baseLabels)
 		}
 	}
-
 	return nil
 }
 
+// updateStatusMetric sets status labels (PLANNED or ONGOING)
 func updateStatusMetric(status string, baseLabels []string) {
 	switch status {
 	case statusPlanned, statusOngoing:
 		for _, s := range []string{statusPlanned, statusOngoing} {
-			value := 0.0
+			val := 0.0
 			if status == s {
-				value = 1.0
+				val = 1.0
 			}
-			maintenanceStatusMetric.WithLabelValues(append(baseLabels, s)...).Set(value)
+			maintenanceStatusMetric.WithLabelValues(append(baseLabels, s)...).Set(val)
 		}
 	default:
-		// Unknown status — set all known statuses to 0
 		clearStatusMetrics(baseLabels)
 	}
 }
 
+// clearStatusMetrics resets known status labels to 0
 func clearStatusMetrics(baseLabels []string) {
 	for _, s := range []string{statusPlanned, statusOngoing} {
 		maintenanceStatusMetric.WithLabelValues(append(baseLabels, s)...).Set(0)
