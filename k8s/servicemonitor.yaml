@@ -4,6 +4,7 @@ metadata:
   name: stackit-maintenance-exporter
   labels:
     release: kube-prometheus-stack
+  namespace: monitoring
 spec:
   selector:
     matchLabels:
