@@ -3,7 +3,7 @@ kind: ServiceMonitor
 metadata:
   name: stackit-maintenance-exporter
   labels:
-    release: prometheus  # Replace with your Prometheus Operator release name if different
+    release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:
@@ -12,6 +12,3 @@ spec:
     - port: http
       interval: 60s
       path: /metrics
-  namespaceSelector:
-    matchNames:
-      - default  # Replace with the namespace where this exporter runs

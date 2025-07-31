@@ -7,12 +7,12 @@ RUN go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o stackit-maintenance-exporter main.go
 
-FROM scratch
+FROM alpine:latest
 
-WORKDIR /
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /app
 
 COPY --from=builder /app/stackit-maintenance-exporter .
 
-EXPOSE 8080
-
-ENTRYPOINT ["/stackit-maintenance-exporter"]
+ENTRYPOINT ["/app/stackit-maintenance-exporter"]

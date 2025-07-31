@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: stackit-maintenance-exporter
+  namespace: monitoring
   labels:
     app: stackit-maintenance-exporter
 spec:
