@@ -18,7 +18,7 @@ spec:
       containers:
         - name: exporter
           imagePullPolicy: Always
-          image: ghcr.io/h3adex/stackit-server-maintenance-exporter:main
+          image: ghcr.io/h3adex/stackit-server-maintenance-exporter:sha256-75c8215bba5cd5298c76c91d84a0c0528a94a176513ed748b756e2917ac6e3c5
           ports:
             - containerPort: 8080
               name: http

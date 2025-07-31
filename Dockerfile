@@ -1,18 +1,10 @@
-FROM golang:1.24 AS builder
+FROM golang:1.24-alpine
 
+RUN apk add --no-cache git ca-certificates
 WORKDIR /app
-
-COPY go.mod go.sum main.go ./
+COPY go.mod go.sum ./
 RUN go mod download
-
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o stackit-maintenance-exporter main.go
-
-FROM alpine:latest
-
-RUN apk add --no-cache ca-certificates
-
-WORKDIR /app
-
-COPY --from=builder /app/stackit-maintenance-exporter .
+COPY main.go ./
+RUN go build -o stackit-maintenance-exporter main.go
 
 ENTRYPOINT ["/app/stackit-maintenance-exporter"]

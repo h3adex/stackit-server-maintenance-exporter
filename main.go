@@ -56,6 +56,7 @@ func main() {
 	}
 
 	client, err := iaas.NewAPIClient(config.WithRegion("eu01"))
+
 	if err != nil {
 		log.Fatalf("Failed to initialize STACKIT client: %v", err)
 	}
